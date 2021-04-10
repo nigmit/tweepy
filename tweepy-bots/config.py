@@ -1,13 +1,13 @@
 # bots/config.py
 import tweepy
 import logging
-import key
+import keys
 
 logger = logging.getLogger()
 
 def create_api():
-    auth = tweepy.OAuthHandler(key.consumer_key_nigmitdan, key.consumer_secret_nigmitdan)
-    auth.set_access_token(key.access_token_nigmitdan, key.access_token_secret_nigmitdan)
+    auth = tweepy.OAuthHandler(keys.consumer_key, keys.consumer_secret)
+    auth.set_access_token(keys.access_token, keys.access_token_secret)
     api = tweepy.API(auth, wait_on_rate_limit=True,
         wait_on_rate_limit_notify=True)
     try:

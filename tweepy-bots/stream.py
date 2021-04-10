@@ -2,7 +2,7 @@ import tweepy
 import time
 from datetime import datetime
 from config import create_api
-import key
+import os
 
 # == OAuth Authentication ==
 api = create_api()
@@ -10,14 +10,14 @@ api = create_api()
 
 class MyStreamListener(tweepy.StreamListener):
 
-    def __init__(self, api, nr_tweets=15, tweet_list=[], latest_tweet_id=1379936267610230789):
+    #
+    def __init__(self, api, nr_tweets=0, latest_tweet_id=1380539222357110786,
+                 file_name=os.path.dirname(os.path.realpath(__file__)) + os.sep + "stream_tweets.txt"):
         self.api = api
         self.me = api.me()
         self.nr_tweets = nr_tweets
-        self.tweet_list = tweet_list
-        self.tweet_list.clear()
         self.latest_tweet_id = latest_tweet_id
-        # self.f = f
+        self.file_name = file_name
 
     def increment(self):
         self.nr_tweets += 1
@@ -27,6 +27,7 @@ class MyStreamListener(tweepy.StreamListener):
         self.latest_tweet_id = tweet_id
 
     def write_to_file(self, file_name, tweet_number, tweet):
+        print("Writing a tweet to file")
         f = open(file_name, "a")
         user_name = tweet.user.name.encode("utf-8")
         f.write(f"{datetime.now()} Tweet {tweet_number} from {user_name} (@{tweet.user.screen_name}): ")
@@ -34,41 +35,62 @@ class MyStreamListener(tweepy.StreamListener):
         f.write('\n\n')
         f.close()
 
+    def get_tweet_text(self, tweet):
+        print('Get the tweet text')
+        print(tweet)
+        if ': ' in tweet:
+            tweet = tweet.split(': ', 1)[1]
+        return tweet
+
+    #tweet = "RT @NeaminZeleke: Egypt snubbing the African Union and insisting on involving the EU &amp;
+    # USA in talks with #Ethiopia about the #GERD is as su…"
+    def tweet_exists(self, file_name, tweet):
+        print('Checking if tweet already handled')
+        print(tweet)
+        with open(file_name) as f:
+            if self.get_tweet_text(tweet)[:70] in f.read():
+                return True
+        return False
+
+    def is_quote_tweet(self, tweet):
+        print("Check if tweet is a quote tweet")
+        if 'quoted_status' in str(tweet):
+            print('This is a quote tweet')
+            return True
+        return False
+
+    def is_retweeted_tweet(self, tweet):
+        print("Check if tweet is a retweet")
+        if 'retweeted_status' in str(tweet):
+            print('This is a retweet tweet')
+            return True
+        return False
+
     def on_status(self, tweet):
         try:
-            print('***Got a tweet***')
-
-            # pick the latest tweets
-            tweet_set = set(self.tweet_list)
-            skip_tweet = 'Tigray Police Man sexually attacked more than 50 women'
-            if tweet.id > self.latest_tweet_id and \
-                    tweet.text not in tweet_set and \
-                    skip_tweet not in tweet.text and \
-                    tweet.in_reply_to_status_id is None:  # Skip reply tweets
+            if self.is_quote_tweet(tweet) is False and \
+                    tweet.id > self.latest_tweet_id and \
+                    self.tweet_exists(self.file_name, tweet.text) is False and \
+                    tweet.id > self.latest_tweet_id:
+                print('*** Got a tweet to retweet ***')
                 tweet.retweet()
                 print('Tweet Retweeted')
-                self.tweet_list.append(tweet.text)
-                # tweepy.utils.convert_to_utf8_str(tweet.user.name)
-                user_name = tweet.user.name.encode("utf-8")
+
                 tweet_number = self.increment()
                 print(tweet.id)
-                file_name = "C:\\Users\\enigdan\\Documents\\Tweepy\\streamed_tweets_nigmitdan.txt"
-                self.write_to_file(file_name, tweet_number, tweet)
-                print(self.tweet_list)
+                self.write_to_file(self.file_name, tweet_number, tweet)
                 wait_minutes = 3
                 print(
-                    f"{datetime.now()} Tweet {tweet_number} from {user_name}(@{tweet.user.screen_name}): "
+                    f"{datetime.now()} Tweet {tweet_number}: "
                     f"{tweet.text}")
                 # tweet.favorite()
-                # print('Tweet Liked')
                 if not tweet.user.following:
-                    print('Follow user', user_name)
+                    print('Follow user', tweet.user.name.encode("utf-8"))
                     tweet.user.follow()
+                if self.is_retweeted_tweet(tweet):
+                    print('Follow user', tweet.retweeted_status.user.name.encode("utf-8"))
+                    tweet.retweeted_status.user.follow()
 
-                # api.update_status(
-                #     status="#EthiopiaPrevails",
-                #     in_reply_to_status_id=tweet.id,
-                # )
                 self.set_tweet_id(tweet.id)
                 print(f" waiting for {wait_minutes} minutes ...")
                 time.sleep(wait_minutes * 60)
