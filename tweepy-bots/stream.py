@@ -1,8 +1,14 @@
 import tweepy
+import logging
 import time
-from datetime import datetime
+import datetime
 from config import create_api
 import os
+import utils
+from timeit import default_timer as timer
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 # == OAuth Authentication ==
 api = create_api()
@@ -10,117 +16,98 @@ api = create_api()
 
 class MyStreamListener(tweepy.StreamListener):
 
-    #
-    def __init__(self, api, nr_tweets=0, latest_tweet_id=1380539222357110786,
-                 file_name=os.path.dirname(os.path.realpath(__file__)) + os.sep + "stream_tweets.txt"):
+    def __init__(self, api, nr_tweets=0, latest_tweet_id=1383170980114145282,
+                 file_name=os.path.dirname(os.path.realpath(__file__)) + os.sep + "streamed_tweets.txt",
+                 follow_counter=0
+                 ):
         self.api = api
         self.me = api.me()
         self.nr_tweets = nr_tweets
         self.latest_tweet_id = latest_tweet_id
         self.file_name = file_name
-
-    def increment(self):
-        self.nr_tweets += 1
-        return self.nr_tweets
+        self.follow_counter = follow_counter
+        self.start_time = timer()
+        logger.info(os.path.dirname(os.path.realpath(__file__)))
 
     def set_tweet_id(self, tweet_id):
         self.latest_tweet_id = tweet_id
 
-    def write_to_file(self, file_name, tweet_number, tweet):
-        print("Writing a tweet to file")
-        f = open(file_name, "a")
-        user_name = tweet.user.name.encode("utf-8")
-        f.write(f"{datetime.now()} Tweet {tweet_number} from {user_name} (@{tweet.user.screen_name}): ")
-        f.write(tweet.text)
-        f.write('\n\n')
-        f.close()
+    def reset_limit_counters(self):
+        elapsed_time = timer() - self.start_time # Elapse time in seconds
+        if elapsed_time > 86400:  # 86400 seconds = 24 hrs
+            logger.info("Resetting limit counters.")
+            self.follow_counter = 0
 
-    def get_tweet_text(self, tweet):
-        print('Get the tweet text')
-        print(tweet)
-        if ': ' in tweet:
-            tweet = tweet.split(': ', 1)[1]
-        return tweet
-
-    #tweet = "RT @NeaminZeleke: Egypt snubbing the African Union and insisting on involving the EU &amp;
-    # USA in talks with #Ethiopia about the #GERD is as su…"
-    def tweet_exists(self, file_name, tweet):
-        print('Checking if tweet already handled')
-        print(tweet)
-        with open(file_name) as f:
-            if self.get_tweet_text(tweet)[:70] in f.read():
-                return True
-        return False
-
-    def is_quote_tweet(self, tweet):
-        print("Check if tweet is a quote tweet")
-        if 'quoted_status' in str(tweet):
-            print('This is a quote tweet')
+    def follow_limit_reached(self):
+        elapsed_time = timer() - self.start_time # Elapse time in seconds
+        logger.info(f"Total users followed = {self.follow_counter}")
+        if  elapsed_time < 72000 and self.follow_counter > 300:  # 72000 seconds = 20 hrs
             return True
         return False
 
-    def is_retweeted_tweet(self, tweet):
-        print("Check if tweet is a retweet")
-        if 'retweeted_status' in str(tweet):
-            print('This is a retweet tweet')
-            return True
-        return False
+    def is_valid_tweet(self, tweet):
+        if utils.is_quote_tweet(tweet) or\
+                tweet.id < self.latest_tweet_id or\
+                utils.tweet_exists(self.file_name, tweet.text) or\
+                tweet.user.id == self.me.id or\
+                tweet.in_reply_to_status_id is not None:
+                #tweet.retweeted:
+            return False
+        return True
+
 
     def on_status(self, tweet):
-        try:
-            if self.is_quote_tweet(tweet) is False and \
-                    tweet.id > self.latest_tweet_id and \
-                    self.tweet_exists(self.file_name, tweet.text) is False and \
-                    tweet.id > self.latest_tweet_id:
-                print('*** Got a tweet to retweet ***')
-                tweet.retweet()
-                print('Tweet Retweeted')
-
-                tweet_number = self.increment()
-                print(tweet.id)
-                self.write_to_file(self.file_name, tweet_number, tweet)
-                wait_minutes = 3
-                print(
-                    f"{datetime.now()} Tweet {tweet_number}: "
-                    f"{tweet.text}")
-                # tweet.favorite()
+        if not self.is_valid_tweet(tweet):
+            return
+        try:    
+            tweet.retweet()
+            logger.info("Tweet Retweeted")
+            tweet_number = utils.increment(self.nr_tweets)
+            logger.info(tweet.id)
+            utils.write_to_file(self.file_name, tweet.text)
+            wait_minutes = 7
+            logger.info(
+                f"{datetime.datetime.now()} Tweet {tweet_number}: "
+                f"{tweet.text}")
+            if  not self.follow_limit_reached():
                 if not tweet.user.following:
-                    print('Follow user', tweet.user.name.encode("utf-8"))
+                    logger.info(f'Follow user {tweet.user.name.encode("utf-8")}')
                     tweet.user.follow()
-                if self.is_retweeted_tweet(tweet):
-                    print('Follow user', tweet.retweeted_status.user.name.encode("utf-8"))
+                    self.follow_counter = self.follow_counter + 1
+                if utils.is_retweeted_tweet(tweet):
+                    logger.info(f'Follow user {tweet.retweeted_status.user.name.encode("utf-8")}')
                     tweet.retweeted_status.user.follow()
-
-                self.set_tweet_id(tweet.id)
-                print(f" waiting for {wait_minutes} minutes ...")
-                time.sleep(wait_minutes * 60)
+                    self.follow_counter = self.follow_counter + 1
+            self.reset_limit_counters()
+            self.set_tweet_id(tweet.id)
+            logger.info(f" waiting for {wait_minutes} minutes ...")
+            time.sleep(wait_minutes * 60)
         except tweepy.TweepError as e:
-            print(e.reason)
+            logger.error(e.reason)
         except UnicodeEncodeError as e:
-            print(e.reason)
+            logger.error(e.reason)
             pass
         except ConnectionResetError:
-            print("Error detected")
+            logger.error("Error detected")
             pass
 
     def on_error(self, status):
-        print("Error detected")
+        logger.info(f"Error detected {status}")
 
 
 def main(t_keyword, f_keyword):
-    tweets_listener = MyStreamListener(api)
-    stream = tweepy.Stream(api.auth, tweets_listener)
-    stream.filter(track=t_keyword, follow=f_keyword, languages=["en", "am"], is_async=False)
+    myStreamListener = MyStreamListener(api)
+    myStream = tweepy.Stream(auth = api.auth, listener=myStreamListener)
+    myStream.filter(track=t_keyword, languages=["en", "am"], is_async=False)
 
 
 if __name__ == "__main__":
-    string_pattern_to_track = ["AhmaraGenocide", "EthiopiaPrevails", "EthioEritreaPrevail", "StandWithEthiopia",
+    string_pattern_to_track = ["ItsMyDam", "ItsOurDam", "FillTheDam", "EthiopiaPrevails", "EthioEritreaPrevail", "StandWithEthiopia",
                                "SupportEthiopia", "UNSCsupportEthiopia", "UnityForEthiopia", "GleanEthiopia",
                                "TplfLies", "TPLFLies", "FakeAxumMassacre", "DeliverTheAid", "TPLFisaTerroristGroup",
                                "TPLFisTheCause", "TPLFCrimes", "TPLFcrimes", "MaiKadraMassacre", "AxumFiction",
-                               "TPLF_Junta", "FillTheDam", "EthiopianLivesMatter", "ItsMyDam",
-                               "DisarmTPLF", "StopScapegoatingEritrea", "RisingEthiopia",
-                               "AbiyMustLead", "TPLFisDEAD"]
+                               "TPLF_Junta", "DisarmTPLF", "StopScapegoatingEritrea",
+                               "RisingEthiopia", "TPLFisDEAD"] # AmharaGenocide EthiopianLivesMatter AbiyMustLead
 
     followers_to_track = ["4077439067",  # @neaminzeleke
                           "1357188308242169856",  # @gleanethiopian
