@@ -42,10 +42,22 @@ def tweet_exists(file_name, tweet):
     return False
 
 
-def is_quote_tweet(tweet):
-    logger.info("Check if tweet is a quote tweet")
-    if 'quoted_status' in str(tweet):
-        logger.info('This is a quote tweet')
+
+
+def is_Invalid_tweet(tweet, latest_tweet_id, me_id, file_name):
+    if tweet_exists(file_name, tweet.text) or\
+            tweet.user.id == me_id or\
+            tweet.in_reply_to_status_id is not None or\
+            "quoted_status" in str(tweet) or\
+            "AbiyToICC" in str(tweet) or\
+            "IrobMassacre" in str(tweet) or\
+            "#tembienMassacre #dengelatMassacre #KunamaStarvation " in str(tweet) or\
+            "TigrayGenocide" in str(tweet) or\
+            "TigrayCantWait" in str(tweet) or\
+            "WarOnTigray" in str(tweet) or\
+            "StandWithTigray" in str(tweet) or\
+            tweet.id < latest_tweet_id:
+            #tweet.retweeted:
         return True
     return False
 
