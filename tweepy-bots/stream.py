@@ -16,7 +16,7 @@ api = create_api()
 
 class MyStreamListener(tweepy.StreamListener):
 
-    def __init__(self, api, nr_tweets=0, latest_tweet_id=1383385979533225984,
+    def __init__(self, api, nr_tweets=0, latest_tweet_id=1384927621063004164,
                  file_name=os.path.dirname(os.path.realpath(__file__)) + os.sep + "streamed_tweets.txt",
                  follow_counter=0
                  ):
@@ -92,12 +92,12 @@ def main(t_keyword, f_keyword):
 
 
 if __name__ == "__main__":
-    string_pattern_to_track = ["ItsMyDam", "ItsOurDam", "FillTheDam", "EthiopiaPrevails", "EthioEritreaPrevail", "StandWithEthiopia",
-                               "SupportEthiopia", "UNSCsupportEthiopia", "UnityForEthiopia", "GleanEthiopia",
-                               "TplfLies", "TPLFLies", "FakeAxumMassacre", "DeliverTheAid", "TPLFisaTerroristGroup",
+    string_pattern_to_track = ["AmharaGenocide", "EthiopianLivesMatter", "ItsMyDam", "ItsOurDam", "FillTheDam", "EthiopiaPrevails", "StandWithEthiopia",
+                               "EthioEritreaPrevail", "SupportEthiopia", "UNSCsupportEthiopia", "UnityForEthiopia", "GleanEthiopia", "GetEthiopianFactsRight",
+                               "TplfLies", "FakeAxumMassacre", "DeliverTheAid", "TPLFisaTerroristGroup",
                                "TPLFisTheCause", "TPLFCrimes", "TPLFcrimes", "MaiKadraMassacre", "AxumFiction",
                                "TPLF_Junta", "DisarmTPLF", "StopScapegoatingEritrea",
-                               "RisingEthiopia", "TPLFisDEAD"] # AmharaGenocide EthiopianLivesMatter AbiyMustLead
+                               "RisingEthiopia", "TPLFisDEAD"] # EthiopianLivesMatter AbiyMustLead
 
     followers_to_track = ["4077439067",  # @neaminzeleke
                           "1357188308242169856",  # @gleanethiopian

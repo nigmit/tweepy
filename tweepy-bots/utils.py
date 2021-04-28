@@ -56,6 +56,7 @@ def is_Invalid_tweet(tweet, latest_tweet_id, me_id, file_name):
             "TigrayCantWait" in str(tweet) or\
             "WarOnTigray" in str(tweet) or\
             "StandWithTigray" in str(tweet) or\
+            "AbiyToICC" in str(tweet) or\
             tweet.id < latest_tweet_id:
             #tweet.retweeted:
         return True
